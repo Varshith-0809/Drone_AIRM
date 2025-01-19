@@ -1,0 +1,74 @@
+import speech_recognition as sr # Importing the speech_recognition module for speech recognition
+import pyttsx3  # Importing the pyttsx3 module for text-to-speech conversion
+import requests # Importing the requests module for making HTTP requests
+import json # Importing the json module for working with JSON data
+
+openai_key = "" # replace with your OpenAI API key
+
+# Create an instance of the speech recognizer
+r = sr.Recognizer()
+
+# Create an instance of the speech synthesizer
+engine = pyttsx3.init()
+
+
+# Set the recognizer to use the default microphone as the audio source
+mic = sr.Microphone()
+
+
+# Define a callback function for when the speech recognizer recognizes a phrase
+def callback(recognizer, audio):
+   try:
+       # Recognize speech using the Google Speech Recognition API
+       phrase = recognizer.recognize_google(audio)
+       print(f"Recognized: {phrase}") #to display the statement
+       if phrase == "Vironica": #condition statement
+           # Speak the prompt to ask question
+           engine.say("What is your question?") #spoken by Veronica
+           engine.runAndWait() #waiting for response from user
+           # Listen for question
+           with mic as source: #specifies path for source
+               r.adjust_for_ambient_noise(source) #reduce distrubances from input
+               audio = r.listen(source) #renewed input is processed
+           try:
+               question = r.recognize_google(audio) #understanding the question
+               print(f"You said: {question}") #display your final question
+               # Send query to OpenAI API
+               headers = {"Content-Type": "application/json",
+                          "Authorization": f"Bearer {openai_key}"} #establising connection
+               data = {"prompt": question,
+                       "engine": "davinci",
+                       "temperature": 0.5,
+                       "max_tokens": 2048,
+                       "top_p": 1,
+                       "frequency_penalty": 0,
+                       "presence_penalty": 0} #question is sent to engine
+               response = requests.post("https://api.openai.com/v1/engines/davinci/completions",
+                                        headers=headers,
+                                        data=json.dumps(data)) #extracting information
+               if response.status_code == 200: #Check to see if the response was effective.
+                   response_data = json.loads(response.text) #Parse the JSON-formatted answer data to see if there are any available response options.
+                   if len(response_data["choices"]) > 0:
+                       answer = response_data["choices"][0]["text"] #Obtain the text of the first available answer.
+                       print(f"OpenAI response: {answer}") # Print the response to the console
+                       # Speak the answer
+                       engine.say(answer) # Put the response in the speaking queue
+                       engine.runAndWait() # Say the response out loud
+                   else:
+                       print("OpenAI did not return any choices.") #failed if will return
+               else:
+                   print(f"OpenAI API returned error: {response.status_code} {response.text}") # In case the API answer was unsuccessful, print an error message.
+           except sr.UnknownValueError:
+               print("Could not understand the question.") #If system was not able to understand the query
+   except sr.UnknownValueError:
+       print("Could not understand speech.") # If Speech Recognition was unable to transcribe the query, print an error notice.
+   except sr.RequestError as e:
+       print(f"Speech recognition service error: {e}") # If there was an issue with the speech recognition server, print an error message.
+
+
+# Start listening for speech input
+print("Listening for 'Vironica' command...") # Display a message to let users know the software is looking for a certain command.
+stop_listening = r.listen_in_background(mic, callback) #When the programme is finished processing the audio input, the "stop listening" variable is used to end the listening procedure.
+# Keep the script running indefinitely
+while True:
+   pass
